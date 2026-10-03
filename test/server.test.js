@@ -71,11 +71,29 @@ test('mp3 maior que o limite devolve 413', async () => {
   });
 });
 
-test('upload acima do limite do multer devolve 413', async () => {
-  await withServer({ convertFn: okConvert, transcribeFn: okTranscribe, maxUploadBytes: 10 }, async (base) => {
-    const res = await fetch(`${base}/transcribe`, { method: 'POST', body: form('audio', 'x'.repeat(100)) });
+test('upload acima do limite do multer devolve 413 com o limite configurado', async () => {
+  const MB = 1024 * 1024;
+  await withServer({ convertFn: okConvert, transcribeFn: okTranscribe, maxUploadBytes: 1 * MB }, async (base) => {
+    const res = await fetch(`${base}/transcribe`, { method: 'POST', body: form('audio', Buffer.alloc(2 * MB)) });
     assert.equal(res.status, 413);
-    assert.deepEqual(await res.json(), { error: 'Arquivo acima de 200 MB.' });
+    assert.deepEqual(await res.json(), { error: 'Arquivo acima de 1 MB.' });
+  });
+});
+
+test('upload de 0 bytes com conversão real devolve 422', async () => {
+  await withServer({ transcribeFn: okTranscribe }, async (base) => {
+    const res = await fetch(`${base}/transcribe`, { method: 'POST', body: form('audio', '', 'vazio.opus') });
+    assert.equal(res.status, 422);
+    assert.deepEqual(await res.json(), { error: 'Não consegui ler esse arquivo como áudio.' });
+  });
+  assert.deepEqual(await fs.readdir(tmpDir), []);
+});
+
+test('transcrição sem fala chega ao cliente como { text: "" }', async () => {
+  await withServer({ convertFn: okConvert, transcribeFn: async () => '' }, async (base) => {
+    const res = await fetch(`${base}/transcribe`, { method: 'POST', body: form() });
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { text: '' });
   });
 });
 

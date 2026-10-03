@@ -116,7 +116,8 @@
     a.href = URL.createObjectURL(blob);
     a.download = `${currentName}.txt`;
     a.click();
-    URL.revokeObjectURL(a.href);
+    // Revogar só depois do navegador iniciar o download.
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   });
 </script>
 </body>

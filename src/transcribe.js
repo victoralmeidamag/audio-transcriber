@@ -13,7 +13,9 @@ export class TranscribeError extends Error {
 
 function messageFor(status, detail) {
   if (status === 401) return 'Chave da Groq inválida.';
+  if (status === 413) return 'A Groq recusou o arquivo por tamanho.';
   if (status === 429) return 'Limite da Groq atingido. Tente mais tarde.';
+  if (status >= 500) return 'A Groq está indisponível no momento. Tente de novo em instantes.';
   return `Erro ao falar com a Groq: ${detail}`;
 }
 

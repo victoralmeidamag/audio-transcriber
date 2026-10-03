@@ -37,7 +37,7 @@ export function createApp({
       let status = 200;
       let body;
       try {
-        if (uploadErr?.code === 'LIMIT_FILE_SIZE') throw new HttpError(413, 'Arquivo acima de 200 MB.');
+        if (uploadErr?.code === 'LIMIT_FILE_SIZE') throw new HttpError(413, `Arquivo acima de ${Math.round(maxUploadBytes / MB)} MB.`);
         if (uploadErr || !req.file) throw new HttpError(400, 'Escolha um arquivo de áudio.');
         if (!apiKey) throw new HttpError(500, 'GROQ_API_KEY não encontrada no .env.');
 
