@@ -1,1 +1,99 @@
-<!doctype html><html lang="pt-BR"><title>Transcritor</title><body>ok</body></html>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transcritor de Áudio</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --fg:#1b1f24; --muted:#5f6b7a; --accent:#2563eb; --border:#d6dbe3; --err:#b42318; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f1115; --card:#181b22; --fg:#e8eaf0; --muted:#9aa4b2; --accent:#60a5fa; --border:#2a2f3a; --err:#f87171; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 32px 16px; }
+  h1 { font-size: 1.5rem; margin: 0 0 16px; }
+  #drop { display:block; border:2px dashed var(--border); border-radius:12px; padding:40px 16px; text-align:center; background:var(--card); cursor:pointer; transition:border-color .15s; }
+  #drop.over { border-color: var(--accent); }
+  #drop p { margin: 0; color: var(--muted); }
+  #drop strong { color: var(--fg); }
+  input[type=file] { display:none; }
+  #status { margin:16px 0; min-height:1.5em; color:var(--muted); }
+  #status.err { color: var(--err); }
+  textarea { width:100%; min-height:260px; padding:12px; border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--fg); font:inherit; resize:vertical; }
+  .actions { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  button { padding:10px 16px; border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--fg); font:inherit; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Transcritor de Áudio</h1>
+  <label id="drop" for="file">
+    <p><strong>Arraste um áudio aqui</strong> ou clique para escolher</p>
+    <p>Qualquer formato: .opus do WhatsApp, .m4a, .mp3, .ogg, .wav, .caf, .amr...</p>
+    <input id="file" type="file" accept="audio/*,.opus,.caf,.amr,.3gp,.wma,.aac,.ogg,.oga,.m4a,.mp3,.wav,.webm,.mp4,.flac">
+  </label>
+  <div id="status"></div>
+  <textarea id="out" placeholder="A transcrição aparece aqui." readonly></textarea>
+  <div class="actions">
+    <button id="copy" class="primary" disabled>Copiar</button>
+    <button id="download" disabled>Baixar .txt</button>
+  </div>
+</main>
+<script>
+  const drop = document.getElementById('drop');
+  const input = document.getElementById('file');
+  const status = document.getElementById('status');
+  const out = document.getElementById('out');
+  const copyBtn = document.getElementById('copy');
+  const dlBtn = document.getElementById('download');
+  let currentName = 'transcricao';
+
+  function setStatus(msg, isErr = false) { status.textContent = msg; status.className = isErr ? 'err' : ''; }
+  function setResult(text) {
+    out.value = text;
+    const has = text.trim().length > 0;
+    copyBtn.disabled = !has; dlBtn.disabled = !has;
+  }
+
+  async function send(file) {
+    if (!file) return;
+    currentName = file.name.replace(/\.[^.]+$/, '') || 'transcricao';
+    setResult('');
+    setStatus(`Transcrevendo "${file.name}"...`);
+    const body = new FormData();
+    body.append('audio', file);
+    try {
+      const res = await fetch('/transcribe', { method: 'POST', body });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setStatus(data.error || `Erro ${res.status}.`, true); return; }
+      if (!data.text || !data.text.trim()) { setStatus('Nenhuma fala detectada.'); return; }
+      setResult(data.text);
+      setStatus('Pronto.');
+    } catch (err) {
+      setStatus('Não consegui falar com o servidor local. Ele está rodando?', true);
+    }
+  }
+
+  input.addEventListener('change', () => send(input.files[0]));
+  ['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', (e) => send(e.dataTransfer.files[0]));
+
+  copyBtn.addEventListener('click', async () => {
+    await navigator.clipboard.writeText(out.value);
+    setStatus('Copiado.');
+  });
+  dlBtn.addEventListener('click', () => {
+    const blob = new Blob([out.value], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${currentName}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+</script>
+</body>
+</html>
