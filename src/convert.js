@@ -14,13 +14,13 @@ export class ConversionError extends Error {
 
 /**
  * Converte qualquer áudio que o ffmpeg leia em MP3 mono 16 kHz 64 kbps.
- * Resolve com outputPath. Lança ConversionError se o ffmpeg falhar.
+ * Resolve com outputPath. Lança ConversionError se o ffmpeg falhar ou estourar o timeout.
  */
-export async function convertToMp3(inputPath, outputPath) {
-  const args = ['-y', '-hide_banner', '-loglevel', 'error',
+export async function convertToMp3(inputPath, outputPath, { timeoutMs = 5 * 60_000 } = {}) {
+  const args = ['-y', '-nostdin', '-hide_banner', '-loglevel', 'error',
     '-i', inputPath, '-vn', '-ac', '1', '-ar', '16000', '-b:a', '64k', outputPath];
   try {
-    await run(ffmpegPath, args, { maxBuffer: 1024 * 1024 });
+    await run(ffmpegPath, args, { maxBuffer: 1024 * 1024, timeout: timeoutMs });
     return outputPath;
   } catch (err) {
     const detail = (err.stderr || err.message || '').trim().split('\n').slice(-3).join(' ');

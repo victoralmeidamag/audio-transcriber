@@ -53,7 +53,8 @@ export function createApp({
         else { console.error(err); status = 500; body = { error: 'Erro interno.' }; }
       } finally {
         // Limpa ANTES de responder, para o cliente nunca ver arquivo temporário sobrando.
-        await Promise.all([inputPath, mp3Path].filter(Boolean).map((p) => fs.rm(p, { force: true })));
+        await Promise.all([inputPath, mp3Path].filter(Boolean)
+          .map((p) => fs.rm(p, { force: true }).catch((e) => console.error('Falha ao apagar temporário', p, e.message))));
       }
       res.status(status).json(body);
     });
@@ -62,9 +63,18 @@ export function createApp({
   return app;
 }
 
+/** Sobe o servidor escutando SOMENTE em 127.0.0.1 (app local, nunca exposto à rede). */
+export function startServer({ port = 3000, host = '127.0.0.1', log = console.log, ...appOpts } = {}) {
+  return new Promise((resolve) => {
+    const server = createApp(appOpts).listen(port, host, () => {
+      log(`Transcritor em http://localhost:${server.address().port}`);
+      resolve(server);
+    });
+  });
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) console.error('AVISO: GROQ_API_KEY não encontrada no .env.');
-  const port = Number(process.env.PORT) || 3000;
-  createApp({ apiKey }).listen(port, () => console.log(`Transcritor em http://localhost:${port}`));
+  startServer({ port: Number(process.env.PORT) || 3000, apiKey });
 }

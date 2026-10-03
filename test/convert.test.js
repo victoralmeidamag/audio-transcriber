@@ -50,3 +50,8 @@ test('arquivo vazio lança ConversionError', async () => {
   await fs.writeFile(empty, '');
   await assert.rejects(convertToMp3(empty, path.join(dir, 'empty.mp3')), ConversionError);
 });
+
+test('timeout mata o ffmpeg e lança ConversionError', async () => {
+  const out = path.join(dir, 'timeout.mp3');
+  await assert.rejects(convertToMp3(path.join(dir, 'tone.wav'), out, { timeoutMs: 1 }), ConversionError);
+});

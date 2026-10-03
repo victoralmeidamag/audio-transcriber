@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { createApp } from '../server.js';
+import { createApp, startServer } from '../server.js';
 import { ConversionError } from '../src/convert.js';
 import { TranscribeError } from '../src/transcribe.js';
 
@@ -103,4 +103,28 @@ test('GET / serve a página', async () => {
     assert.equal(res.status, 200);
     assert.match(res.headers.get('content-type'), /text\/html/);
   });
+});
+
+test('falha na limpeza do tmp não derruba o servidor', async () => {
+  // convertFn cria um DIRETÓRIO no lugar do mp3: fs.rm sem recursive rejeita (EISDIR/ERR_FS_EISDIR)
+  const dirConvert = async (inp, out) => { await fs.mkdir(out); return out; };
+  let leftover;
+  await withServer({ convertFn: dirConvert, transcribeFn: okTranscribe }, async (base) => {
+    const res = await fetch(`${base}/transcribe`, { method: 'POST', body: form() });
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { text: 'texto transcrito' });
+    const second = await fetch(`${base}/`);
+    assert.equal(second.status, 200, 'servidor continua respondendo');
+  });
+  leftover = (await fs.readdir(tmpDir)).map((f) => path.join(tmpDir, f));
+  await Promise.all(leftover.map((p) => fs.rm(p, { recursive: true, force: true })));
+});
+
+test('startServer escuta só em 127.0.0.1', async () => {
+  const server = await startServer({ port: 0, apiKey: 'k', tmpDir, log: () => {} });
+  try {
+    assert.equal(server.address().address, '127.0.0.1');
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
 });

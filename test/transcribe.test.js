@@ -74,3 +74,9 @@ test('falha de rede vira TranscribeError sem groqStatus', async () => {
       && err.message === 'Erro ao falar com a Groq: fetch failed',
   );
 });
+
+test('chamada à Groq leva um AbortSignal de timeout', async () => {
+  const f = fakeFetch(200, { text: 'x' });
+  await transcribe(mp3, { apiKey: 'k', fetchImpl: f });
+  assert.ok(f.calls[0].init.signal instanceof AbortSignal);
+});

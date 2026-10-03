@@ -21,7 +21,7 @@ function messageFor(status, detail) {
  * Envia um MP3 à Groq e devolve o texto transcrito.
  * Lança TranscribeError com mensagem em português.
  */
-export async function transcribe(mp3Path, { apiKey, fetchImpl = fetch, model = 'whisper-large-v3' }) {
+export async function transcribe(mp3Path, { apiKey, fetchImpl = fetch, model = 'whisper-large-v3', timeoutMs = 120_000 }) {
   const buf = await fs.readFile(mp3Path);
   const body = new FormData();
   body.append('file', new Blob([buf], { type: 'audio/mpeg' }), path.basename(mp3Path));
@@ -30,7 +30,8 @@ export async function transcribe(mp3Path, { apiKey, fetchImpl = fetch, model = '
 
   let res;
   try {
-    res = await fetchImpl(GROQ_URL, { method: 'POST', headers: { Authorization: `Bearer ${apiKey}` }, body });
+    res = await fetchImpl(GROQ_URL, { method: 'POST', headers: { Authorization: `Bearer ${apiKey}` }, body,
+      signal: AbortSignal.timeout(timeoutMs) });
   } catch (err) {
     throw new TranscribeError(messageFor(undefined, err.message), undefined, err);
   }
