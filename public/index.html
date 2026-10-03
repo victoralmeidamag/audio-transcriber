@@ -15,6 +15,7 @@
   h1 { font-size: 1.5rem; margin: 0 0 16px; }
   #drop { display:block; border:2px dashed var(--border); border-radius:12px; padding:40px 16px; text-align:center; background:var(--card); cursor:pointer; transition:border-color .15s; }
   #drop.over { border-color: var(--accent); }
+  #drop.busy { opacity:.6; cursor:progress; }
   #drop p { margin: 0; color: var(--muted); }
   #drop strong { color: var(--fg); }
   input[type=file] { display:none; }
@@ -50,6 +51,13 @@
   const copyBtn = document.getElementById('copy');
   const dlBtn = document.getElementById('download');
   let currentName = 'transcricao';
+  let busy = false;
+
+  function setBusy(on) {
+    busy = on;
+    input.disabled = on;
+    drop.classList.toggle('busy', on);
+  }
 
   function setStatus(msg, isErr = false) { status.textContent = msg; status.className = isErr ? 'err' : ''; }
   function setResult(text) {
@@ -60,6 +68,8 @@
 
   async function send(file) {
     if (!file) return;
+    if (busy) { setStatus('Aguarde a transcrição atual terminar.', true); return; }
+    setBusy(true);
     currentName = file.name.replace(/\.[^.]+$/, '') || 'transcricao';
     setResult('');
     setStatus(`Transcrevendo "${file.name}"...`);
@@ -74,6 +84,9 @@
       setStatus('Pronto.');
     } catch (err) {
       setStatus('Não consegui falar com o servidor local. Ele está rodando?', true);
+    } finally {
+      setBusy(false);
+      input.value = '';
     }
   }
 
@@ -81,10 +94,21 @@
   ['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
   ['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
   drop.addEventListener('drop', (e) => send(e.dataTransfer.files[0]));
+  // Soltar fora da área: impede o navegador de abrir o arquivo e perder a página.
+  ['dragover', 'drop'].forEach((ev) => window.addEventListener(ev, (e) => e.preventDefault()));
 
   copyBtn.addEventListener('click', async () => {
-    await navigator.clipboard.writeText(out.value);
-    setStatus('Copiado.');
+    try {
+      if (!navigator.clipboard) throw new Error('clipboard indisponível');
+      await navigator.clipboard.writeText(out.value);
+      setStatus('Copiado.');
+    } catch (err) {
+      out.focus();
+      out.select();
+      const ok = document.execCommand && document.execCommand('copy');
+      if (ok) setStatus('Copiado.');
+      else setStatus('Não consegui copiar. O texto está selecionado: use Cmd+C.', true);
+    }
   });
   dlBtn.addEventListener('click', () => {
     const blob = new Blob([out.value], { type: 'text/plain;charset=utf-8' });
